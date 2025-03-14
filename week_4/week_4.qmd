@@ -1,0 +1,49 @@
+---
+title: "Regression Analysis on HPRICE2 Dataset"
+author: "Your Name"
+date: "`r Sys.Date()`"
+format: html
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+## Task Description
+
+In this analysis, we will explore the elasticity of house prices
+concerning environmental variables, specifically focusing on the nox
+(nitric oxides concentration). We will also examine the effects of an
+increasing number of rooms in a house while considering non-constant
+effects.
+
+### Objectives
+
+Set up a regression model to answer the following:
+
+1.  **What is the elasticity of price with respect to the level of NOX (pollution in the area)**
+2.  **Estimate the effects of adding an 8th room and a 5th room, assuming non-constant effects of the number of rooms.**
+3.  **Assess the number of houses in the sample with less than 4 rooms
+    and calculate the uncertainty of fit for such observations.**
+4.  **Set up a regression another regression model that relaxes the constant elasticity
+    assumption.**
+
+## Setup
+
+### Data Preparation
+
+-   Load the HPRICE2 dataset.
+-   Inspect the structure of the data to identify necessary variables.
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(stargazer)
+
+# Load the dataset
+data <- readr::read_csv("week_4/data/HPRICE2.csv")
+
+# Inspect the data
+head(data)
+summary(data)
+```
