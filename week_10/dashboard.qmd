@@ -1,0 +1,133 @@
+---
+title: "Interactive Data Visualization"
+format:
+  html:
+    page-layout: custom
+server: shiny
+---
+```{r setup, include=FALSE}
+#| context: setup
+# packages
+library(shiny)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(bslib)
+source("functions.R")
+
+```
+
+# {.main-body}
+```{r input-panel}
+#| panel: sidebar
+
+numericInput("selectPopulSize",
+  "Select Population Size:",
+  value = 10000, min = 100, max = 1000000
+)
+
+numericInput("selectSampleSize",
+  "Select Sample Size:",
+  value = 500, min = 100, max = 100000
+)
+
+selectInput("selectedVariable", "Choose Variable:",
+  choices = c("IQ", "expert", "educ"),
+  multiple = FALSE
+)
+```
+
+
+
+```{r input-panel2}
+#| panel: fill
+
+  navset_card_underline(
+    nav_panel("Scatterplot",  plotlyOutput("scatterPlot"))
+  )
+
+```
+
+# Price Prediction
+
+
+
+```{r input-panel3}
+#| panel: sidebar
+sliderInput("selectNumSamples",
+  "Number of sampling iterations:",
+  value = 100, min = 1, max = 1000, step = 20
+)
+
+checkboxInput("showWLS", "Overlay WLS estimates", value = FALSE)
+
+```
+
+
+```{r input-panel4}
+#| panel: fill
+plotlyOutput("histogramPlot")
+```
+
+
+```{r, echo=FALSE}
+#| context: server
+population <- reactive({
+  generateHeteroskedasticPopulation(N = input$selectPopulSize)
+})
+
+sample <- reactive({
+  population() %>%
+    dplyr::slice_sample(
+      n = input$selectSampleSize, replace = F
+    )
+})
+
+
+sampling_distributions <- reactive({
+  generateSamplingDistributionsData(
+    population = population(),
+    n_replications = input$selectNumSamples,
+    sample_size = input$selectSampleSize
+  )
+})
+
+sampling_distributions_wls <- reactive({
+  generateSamplingDistributionsDataWithWLS(
+    population = population(),
+    n_replications = input$selectNumSamples,
+    sample_size = input$selectSampleSize
+  )
+})
+
+
+
+# Generate a scatterplot of the selected variable against price
+output$scatterPlot <- renderPlotly({
+  gg <- ggplot(sample(), aes_string(x = input$selectedVariable, y = "wage")) +
+    geom_point(color = "darkred") +
+    geom_smooth(method = "lm", se = TRUE, color = "blue") +
+    theme_minimal() +
+    labs(x = input$selectedVariable, y = "Price", title = paste("Scatterplot of", input$selectedVariable, "vs Wage"))
+
+  ggplotly(gg)
+})
+
+
+output$histogramPlot <- renderPlotly({
+  p <- sampling_distributions() %>%
+    ggplot(aes(x = estimate)) +
+    geom_vline(aes(xintercept = true_val)) +
+    geom_histogram(color = "dodgerblue2", fill = "dodgerblue2", alpha = 0.5) +
+    facet_wrap(~term, scales = "free")
+
+
+  if (input$showWLS) {
+    p <- p + geom_histogram(aes(x = estimate), data = sampling_distributions_wls(), color = "red2", fill = "red2", alpha = 0.5) +
+      facet_wrap(~term, scales = "free")
+  }
+  print(p)
+})
+
+```
