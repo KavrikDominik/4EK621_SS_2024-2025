@@ -1,0 +1,197 @@
+---
+title: "Interactive Data Visualization"
+format:
+  html:
+    page-layout: custom
+server: shiny
+---
+```{r setup, include=FALSE}
+#| context: setup
+# packages
+library(shiny)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(bslib)
+
+full_data <- read.csv("full_data.csv")
+
+regressors <- c("combi", "km", "fuel", "age", "displacement", "model", "gearbox_id")
+
+data <- full_data %>%
+  dplyr::select(any_of(c("price", regressors)))
+
+data_superb <- full_data %>% 
+  dplyr::select(any_of(c("price", regressors))) %>% 
+  mutate(
+    model = as.factor(model),
+    fuel = as.factor(fuel),
+    combi = as.factor(combi),
+    gearbox_id = as.factor(gearbox_id),
+         ) %>% na.omit() %>% 
+  filter(model=="superb") %>% 
+  mutate(
+    diesel = ifelse(fuel=="diesel", 1,0),
+    automatic = ifelse(gearbox_id==3,1,0),
+    combi = as.numeric(combi)
+  )
+model_superb <- lm(log(price) ~ age + km + combi + automatic + diesel, data = data_superb)
+
+```
+
+# {.main-body}
+```{r input-panel}
+#| panel: sidebar
+
+selectInput("selectedModel", "Select Model:",
+  choices = unique(data$model),
+  multiple = FALSE,
+  selectize = TRUE,
+  selected = unique(data$model)[1]
+)
+
+selectInput("selectedVariable", "Choose Variable:",
+  choices = colnames(data), multiple = FALSE
+)
+```
+
+
+
+```{r input-panel2}
+#| panel: fill
+
+  navset_card_underline(
+    title = "Histogram",
+    # Panel with plot ----
+    nav_panel("Histogram",  plotlyOutput("histogramPlot") ),
+
+    # Panel with summary ----
+    nav_panel("Scatterplot",  plotlyOutput("scatterPlot")),
+
+    # Panel with table ----
+    nav_panel("Table", tableOutput("table"))
+  )
+
+
+
+
+```
+
+# Price Prediction
+
+
+
+```{r input-panel3}
+#| panel: sidebar
+
+numericInput("age", "Age (in years):", value = 5, min = 0, max = 20)
+numericInput("km", "Kilometers (in thousands):", value = 100000, min = 0, max = 500000)
+selectInput("combi", "Combi (1 for combi, 0 for other):", choices = c(0, 1))
+selectInput("fuel", "Fuel Type:", choices = c("petrol", "diesel"))
+selectInput("gearbox", "Gearbox:", choices = c("manual", "automatic"))
+actionButton("predict_btn", "Predict Price")
+
+
+```
+
+
+
+```{r input-panel4}
+#| panel: fill
+
+
+  navset_card_underline(
+  
+    nav_panel("Prediction",
+      verbatimTextOutput("prediction"))
+  )
+
+
+
+
+```
+
+
+
+
+```{r, echo=FALSE}
+#| context: server
+
+filteredData <- reactive({
+  data %>%
+    filter(model == input$selectedModel)
+})
+
+
+newdata <- reactive({
+    data.frame(
+      age = input$age,
+      km = input$km,
+      combi = as.numeric(input$combi),
+      diesel = ifelse(input$fuel == "diesel", 1, 0),
+      automatic = ifelse(input$gearbox == "automatic", 1, 0)
+    )
+  })
+  
+  # Function to generate prediction based on newdata
+  prediction <- reactive({
+    # Predict using the centered model with newdata
+    log_price <- predict(model_superb, newdata = newdata())
+    
+    # Exponentiate to get back to price scale
+    exp(log_price)
+  })
+  
+  # Display prediction when button is pressed
+  output$prediction <- renderText({
+    req(input$predict_btn)  # Ensure prediction only runs when button is clicked
+    paste("Approximate Price: CZK", round(prediction(), 2))
+  })
+
+
+# Generate a scatterplot of the selected variable against price
+output$scatterPlot <- renderPlotly({
+  gg <- ggplot(filteredData(), aes_string(x = input$selectedVariable, y = "price")) +
+    geom_point(color = "darkred") +
+    geom_smooth(method = "lm", se = TRUE, color = "blue") +
+    theme_minimal() +
+    labs(x = input$selectedVariable, y = "Price", title = paste("Scatterplot of", input$selectedVariable, "vs Price"))
+
+  ggplotly(gg)
+})
+
+
+# Generate a histogram of the selected variable
+output$histogramPlot <- renderPlotly({
+  if (is.numeric(data[[input$selectedVariable]])) {
+    gg <- ggplot(filteredData(), aes_string(x = input$selectedVariable)) +
+      geom_histogram(fill = "blue", color = "white", alpha = 0.7) +
+      theme_minimal() +
+      labs(x = input$selectedVariable, y = "Count", title = paste("Histogram of", input$selectedVariable))
+  } else {
+    gg <- ggplot(filteredData(), aes_string(x = input$selectedVariable))
+  }
+  ggplotly(gg)
+})
+
+output$table <- renderTable({
+  filteredData() %>%
+    summarise(
+      min_price = min(price),
+      max_price = max(price),
+      mean_price = mean(price)
+    )
+})
+
+
+
+
+
+
+```
+
+
+
+
+
