@@ -7,12 +7,12 @@ library(pROC)
 library(ggplot2)
 
 # Data --------------------------------------------------------------------
-data <- read.csv("week_12/data/credit_scoring.csv")
+data <- read.csv("week_12/data/credit_scoring_sample.csv")
 
 data <- data[complete.cases(data),] # removes observation with NAs
 
 data <- data %>% 
-  mutate(deliq = ifelse(`NumberOfTime30-59DaysPastDueNotWorse` > 0, 1, 0))
+  mutate(deliq = ifelse(`NumberOfTime30.59DaysPastDueNotWorse` > 0, 1, 0))
 
 equation <- as.formula(SeriousDlqin2yrs ~ age + MonthlyIncome + deliq)
 
